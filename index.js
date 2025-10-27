@@ -394,24 +394,6 @@ module.exports = function(app) {
 			              },
 			            },
 			          },
-			          nauticalDusk: {
-			            type: 'object',
-			            title: 'Nautical Dusk',
-			            properties: {
-			              mode: {
-			                type: 'string',
-			                title: 'Select day or night mode',
-			                enum: ['day', 'night'],
-			                enumNames: ['Day', 'Night'],
-			                default: 'night'
-			              },
-			              backlight: {
-			                type: 'number',
-			                title: 'Backlight level in nautical dusk (1-10)',
-			                default: 3,
-			              },
-			            },
-			          },
 			          dusk: {
 			            type: 'object',
 			            title: 'Dusk',
@@ -427,6 +409,24 @@ module.exports = function(app) {
 			                type: 'number',
 			                title: 'Backlight level in dusk (1-10)',
 			                default: 4,
+			              },
+			            },
+			          },
+			          nauticalDusk: {
+			            type: 'object',
+			            title: 'Nautical Dusk',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nautical dusk (1-10)',
+			                default: 3,
 			              },
 			            },
 			          },
