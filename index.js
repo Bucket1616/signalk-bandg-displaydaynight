@@ -27,9 +27,20 @@ module.exports = function(app) {
   plugin.start = function(options, restartPlugin) {
     plugin.options = options;
     app.debug('Plugin started');
-    app.debug('Schema: %s', JSON.stringify(options));
-    var lastState = {};
-    var runMode = 'mode'
+    
+    // Note: removed "var lastState = {}" that was here in your original code
+    // because it shadowed the global variable defined at the top of the file.
+    // We will use a new local tracking object.
+    
+    var runMode = 'mode';
+
+    // --- NEW: Cache for the last command sent per group ---
+    // Structure: { 'Default': { mode: 'day', level: 10 } }
+    var lastSentSettings = {}; 
+
+    // --- NEW: Tracker for Resync Activity ---
+    // Structure: { 'Group_Source_Path': timestamp_ms }
+    var activityTracker = {};
 
     //api for adjustments
     app.registerPutHandler('vessels.self', 'environment.displayMode.control', doChangeDisplayMode, PLUGIN_ID);
@@ -45,12 +56,27 @@ module.exports = function(app) {
       }
       ]
     }
+
     if (typeof options.config != 'undefined') {
       options.config.forEach(config => {
-        localSubscription.subscribe.push(
-        {
-          path: config.Lux['path']  // For lux based
-        })
+        // Add Lux path if configured
+        if(config.Lux && config.Lux['path']) {
+           localSubscription.subscribe.push({
+             path: config.Lux['path']
+           })
+        }
+
+        // --- NEW: Subscribe to Resync Trigger Paths ---
+        if (config.Resync && Array.isArray(config.Resync)) {
+          config.Resync.forEach(trigger => {
+            if (trigger.path && trigger.path.length > 0) {
+              app.debug(`Adding monitor subscription for group ${config.group}: ${trigger.path}`);
+              localSubscription.subscribe.push({
+                path: trigger.path
+              });
+            }
+          });
+        }
       })
     }
 
@@ -62,16 +88,54 @@ module.exports = function(app) {
       },
       delta => {
         delta.updates.forEach(u => {
-          app.debug('u: %s', JSON.stringify(u))
+          // Standard variables
           var path = u['values'][0]['path']
           var value = u['values'][0]['value']
+          var source = u['source'] ? u['source']['label'] : delta.source ? delta.source.label : 'unknown'; // Get source label
+          
           options.config.forEach(config => {
+            var group = config.group;
+            if (config.Resync && Array.isArray(config.Resync)) {
+              config.Resync.forEach(trigger => {
+                // Check if this delta matches the trigger path
+                if (trigger.path === path) {
+                   // Check if source matches (if configured)
+                   if (trigger.source && trigger.source !== '' && trigger.source !== source) {
+                     return; // Source didn't match
+                   }
 
+                   // Generate unique key for this specific trigger instance
+                   var trackerKey = `${group}_${source}_${path}`;
+                   var now = Date.now();
+                   var lastSeen = activityTracker[trackerKey];
+                   var timeoutMs = (trigger.timeout || 60) * 1000;
+
+                   // If never seen, or timeout expired
+                   if (!lastSeen || (now - lastSeen > timeoutMs)) {
+                     app.debug(`Resync Triggered for Group ${group}. Device ${source} on ${path} active after ${lastSeen ? (now-lastSeen)/1000 : 'infinite'}s silence.`);
+                     
+                     // Force resend of last known settings
+                     if (lastSentSettings[group]) {
+                       var settings = lastSentSettings[group];
+                       app.debug(`Resending cached settings: Mode ${settings.mode}, Level ${settings.level}`);
+                       
+                       // We call the raw N2K senders directly to avoid loop/logic checks
+                       setDisplayMode(settings.mode, group);
+                       setBacklightLevel(settings.level, group);
+                     } else {
+                       app.debug(`Cannot Resync: No settings have been calculated yet for group ${group}`);
+                     }
+                   }
+
+                   // Update activity timestamp
+                   activityTracker[trackerKey] = now;
+                }
+              });
+            }
             //always use external control if selected
             if (config.source == 'none')
               return;
         
-            var group = config.group
             app.debug(`RunMode: ${runMode} group: ${group} luxPath: ${config.Lux['path']}`)
             if (config.source == 'lux' && path == config.Lux.path) { 
               app.debug('Switching to runMode \'lux\'')
@@ -89,15 +153,11 @@ module.exports = function(app) {
                 }
 
 			          if (dayNight == 'night') {
-			            setDisplayMode(dayNight, group)
-			            setBacklightLevel(config.Mode['nightLevel'], group)
-			            app.debug('Setting display mode to %s and backlight level to %s', dayNight, config.Mode['nightLevel'])
-	                sendUpdate(dayNight, config.Mode['nightLevel'])
+			            executeCommand(dayNight, config.Mode['nightLevel'], group);
+			            app.debug('Setting display mode to %s and backlight level to %s for group %s', dayNight, config.Mode['nightLevel'],group)
 			          } else {
-			            setDisplayMode(dayNight, group)
-			            setBacklightLevel(config.Mode['dayLevel'], group)
-			            app.debug('Setting display mode to %s and backlight level to %s', dayNight, config.Mode['dayLevel'])
-	                sendUpdate(dayNight, config.Mode['dayLevel'])
+			            executeCommand(dayNight, config.Mode['dayLevel'], group);
+			            app.debug('Setting display mode to %s and backlight level to %s for group %s', dayNight, config.Mode['dayLevel'], group)
 	              }
                 if (config['source'] != 'mode') { 
                   app.debug('Used backup mode \'mode\', switching to \'sun\'')
@@ -142,7 +202,16 @@ module.exports = function(app) {
       }
     );
 
-    // Plugin code here
+     
+    function executeCommand(mode, level, group) {
+      // Cache this simply
+      lastSentSettings[group] = { mode: mode, level: level };
+       
+      app.debug(`Executing command for Group ${group}: Mode=${mode}, Level=${level}`);
+      setDisplayMode(mode, group);
+      setBacklightLevel(level, group);
+      sendUpdate(mode, level);
+    }
 		
     function doChangeDisplayMode(context, path, value, callback)
     {
@@ -152,10 +221,14 @@ module.exports = function(app) {
       if (!(value.group in networkGroups))
         value.group = 'Default';
 
-      //did we send a mode?
+      // Update cache manually if PUT request is used
+      if (!lastSentSettings[value.group]) lastSentSettings[value.group] = {};
+			
+			//did we send a mode?
       if (!(value.mode in ['day', 'night']))
       {
-        app.debug(`Update display daynight mode: ${value.mode}`)
+        lastSentSettings[value.group].mode = value.mode;
+				app.debug(`Update display daynight mode: ${value.mode}`)
         setDisplayMode(value.mode, value.group)
       }
       
@@ -272,7 +345,32 @@ module.exports = function(app) {
 			        enumNames: ['Mode based', 'Sun based', 'Lux based', 'None / External (Use PUT interface)'],
 			        default: 'mode'
 			      },
-			      Mode: {
+            Resync: {
+              title: 'Device Power-On Resync',
+              description: 'Force a settings update when a device appears after being offline.',
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  path: {
+                    type: 'string',
+                    title: 'Trigger Path (e.g. navigation.position)',
+                    default: ''
+                  },
+                  source: {
+                    type: 'string',
+                    title: 'Source ID (e.g. NMEA2000.115). Leave empty to match any source.',
+                    default: ''
+                  },
+                  timeout: {
+                    type: 'number',
+                    title: 'Inactivity Timeout (seconds). Resend settings if data is seen after this many seconds of silence.',
+                    default: 60
+                  }
+                }
+              }
+            },
+						Mode: {
 			        title: 'Mode based settings',
 			        description: 'Adjust the display mode based on `environment.mode` (derived-data). Below the backlight level can be set for day and night mode.',
 			        type: 'object',
