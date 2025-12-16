@@ -103,36 +103,39 @@ module.exports = function(app) {
               config.Resync.forEach(trigger => {
                 // Check if this delta matches the trigger path
                 if (trigger.path === path) {
-                   // Check if source matches (if configured)
-                   if (trigger.source && trigger.source !== '' && trigger.source !== source) {
-                     return; // Source didn't match
-                   }
+                  // Check if source matches (if configured)
+                  if (trigger.source && trigger.source !== '' && trigger.source !== source) {
+                    return; // Source didn't match
+                  }
+				  app.debug('Trigger delta received, updated last seen time');
+					
+                  // Generate unique key for this specific trigger instance
+				  // Recall the timestamp of the last transmission. If the next transmission occures after more than 'timeout',
+				  // it is assumed the device is powered off and the backlighting values for 'now' should be sent
+                  var trackerKey = `${group}_${source}_${path}`;
+                  var now = Date.now();
+                  var lastSeen = activityTracker[trackerKey];
+                  var timeoutMs = (trigger.timeout || 60) * 1000;
 
-                   // Generate unique key for this specific trigger instance
-                   var trackerKey = `${group}_${source}_${path}`;
-                   var now = Date.now();
-                   var lastSeen = activityTracker[trackerKey];
-                   var timeoutMs = (trigger.timeout || 60) * 1000;
-
-                   // If never seen, or timeout expired
-                   if (!lastSeen || (now - lastSeen > timeoutMs)) {
-                     app.debug(`Resync Triggered for Group ${group}. Device ${source} on ${path} active after ${lastSeen ? (now-lastSeen)/1000 : 'infinite'}s silence.`);
+				  // If never seen, or timeout expired
+                  if (!lastSeen || (now - lastSeen > timeoutMs)) {
+                    app.debug(`Resync Triggered for Group ${group}. Device ${source} on ${path} active after ${lastSeen ? (now-lastSeen)/1000 : 'infinite'}s silence.`);
                      
-                     // Force resend of last known settings
-                     if (lastSentSettings[group]) {
-                       var settings = lastSentSettings[group];
-                       app.debug(`Resending cached settings: Mode ${settings.mode}, Level ${settings.level}`);
+                    // Force resend of last known settings
+                    if (lastSentSettings[group]) {
+                      var settings = lastSentSettings[group];
+                      app.debug(`Resending cached settings: Mode ${settings.mode}, Level ${settings.level}`);
                        
-                       // We call the raw N2K senders directly to avoid loop/logic checks
-                       setDisplayMode(settings.mode, group);
-                       setBacklightLevel(settings.level, group);
-                     } else {
-                       app.debug(`Cannot Resync: No settings have been calculated yet for group ${group}`);
-                     }
-                   }
+                      // We call the raw N2K senders directly to avoid loop/logic checks
+                      setDisplayMode(settings.mode, group);
+                      setBacklightLevel(settings.level, group);
+                    } else {
+                      app.debug(`Cannot Resync: No settings have been calculated yet for group ${group}`);
+                	}
+                  }
 
-                   // Update activity timestamp
-                   activityTracker[trackerKey] = now;
+                  // Update activity timestamp
+                  activityTracker[trackerKey] = now;
                 }
               });
             }
@@ -347,14 +350,14 @@ module.exports = function(app) {
             // Resync Section
             Resync: {
               title: 'Device Power-On Resync',
-              description: 'Force a settings update when a device appears after being offline.',
+              description: 'Force a settings update when a device (i.e., chartplotter) appears after being offline.',
               type: 'array',
               items: {
                 type: 'object',
                 properties: {
                   path: {
                     type: 'string',
-                    title: 'Trigger Path (e.g. navigation.courseOverGround)',
+                    title: 'Trigger Path (e.g. navigation.courseOverGround, or navigation.currentRoute.name - See README)',
                     default: ''
                   },
                   source: {
