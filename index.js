@@ -408,13 +408,31 @@ module.exports = function(app) {
 			      },
 			      Sun: {
 			        title: 'Sun based settings',
-			        description: 'Adjust the display mode based on `environment.sun` (derived-data). Below the display mode and backlight level can be set for each mode.',
+			        description: 'Adjust the display mode based on `environment.sun` (derived-data). Below the display mode and backlight level can be set for each mode. Supports: nauticalDawn, dawn, sunrise, day, sunset, nauticalDusk, dusk, night.',
 			        type: 'object',
 			        properties: {
 			          updateOnce: {
 			            type: 'boolean',
 			            title: 'Update display mode only when environment.sun changes.',
 			            default: true,
+			          },
+			          nauticalDawn: {
+			            type: 'object',
+			            title: 'Nautical Dawn',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nautical dawn (1-10)',
+			                default: 3,
+			              },
+			            },
 			          },
 			          dawn: {
 			            type: 'object',
@@ -429,7 +447,7 @@ module.exports = function(app) {
 			              },
 			              backlight: {
 			                type: 'number',
-			                title: 'Backlight level in nightmode (1-10)',
+			                title: 'Backlight level in dawn (1-10)',
 			                default: 4,
 			              },
 			            },
@@ -447,7 +465,7 @@ module.exports = function(app) {
 			              },
 			              backlight: {
 			                type: 'number',
-			                title: 'Backlight level in nightmode (1-10)',
+			                title: 'Backlight level in sunrise (1-10)',
 			                default: 4,
 			              },
 			            },
@@ -483,7 +501,7 @@ module.exports = function(app) {
 			              },
 			              backlight: {
 			                type: 'number',
-			                title: 'Backlight level in nightmode (1-10)',
+			                title: 'Backlight level in sunset (1-10)',
 			                default: 4,
 			              },
 			            },
@@ -501,8 +519,26 @@ module.exports = function(app) {
 			              },
 			              backlight: {
 			                type: 'number',
-			                title: 'Backlight level in day mode (1-10)',
+			                title: 'Backlight level in dusk (1-10)',
 			                default: 4,
+			              },
+			            },
+			          },
+			          nauticalDusk: {
+			            type: 'object',
+			            title: 'Nautical Dusk',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nautical dusk (1-10)',
+			                default: 3,
 			              },
 			            },
 			          },
