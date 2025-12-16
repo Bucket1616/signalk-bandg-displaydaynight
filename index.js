@@ -274,7 +274,7 @@ module.exports = function(app) {
     }
 
     function setDisplayMode(mode, group) {
-      app.debug('setDisplayMode: Using group: %s (%s)', group, networkGroups[group])
+      app.debug('setDisplayMode for group: %s to %s', group, mode)
       var PGN130845_dayNight = "%s,3,130845,%s,255,0e,41,9f,ff,ff,%s,ff,ff,26,00,01,%s,ff,ff,ff"; // 02 = day, 04 = night
       if (mode == 'day') {
         var msg = util.format(PGN130845_dayNight, (new Date()).toISOString(), sourceAddress, networkGroups[group], '02');
@@ -287,7 +287,7 @@ module.exports = function(app) {
     }
 
     function setBacklightLevel(level, group) {
-      app.debug('setBacklightLevel: Using group: %s (%s)', group, networkGroups[group])
+      app.debug('setBacklightLevel for group: %s to level %s', group, level)
       var PGN130845_backlightLevel = "%s,3,130845,%s,255,0e,41,9f,ff,ff,%s,ff,ff,12,00,01,%s,ff,ff,ff"; 
       var msg = util.format(PGN130845_backlightLevel, (new Date()).toISOString(), sourceAddress, networkGroups[group], intToHex(level*10));
       sendN2k([msg]);
