@@ -87,27 +87,31 @@ module.exports = function(app) {
       },
       delta => {
         delta.updates.forEach(u => {
-          app.debug('u: %s', JSON.stringify(u))
+          app.debug('delta sub: %s', JSON.stringify(u))
 		  var path = u['values'][0]['path']
           var value = u['values'][0]['value']
           var source = u['source'] ? u['source']['label'] : delta.source ? delta.source.label : 'unknown'; 
           
           options.config.forEach(config => {
             var group = config.group;
-            app.debug(`RunMode: ${runMode} group: ${group}`)
+            app.debug(`RunMode: ${runMode}, group: ${group}`)
 
             // --------------------------------------------------------
             // Resync Logic
             // --------------------------------------------------------
             if (config.Resync && Array.isArray(config.Resync)) {
-              config.Resync.forEach(trigger => {
+              app.debug('in first if')
+				config.Resync.forEach(trigger => {
                 // Check if this delta matches the trigger path
+				app.debug('in second if')
                 if (trigger.path === path) {
                   // Check if source matches (if configured)
+					app.debug('in third if')
                   if (trigger.source && trigger.source !== '' && trigger.source !== source) {
-                    return; // Source didn't match
+                    app.debug(`Trigger source ${trigger.source} did not match saved source ${source}`)
+					  return; // Source didn't match
                   }
-				  app.debug('Trigger delta received, updated last seen time');
+				  app.debug('Trigger delta received, updated last-seen time');
 					
                   // Generate unique key for this specific trigger instance
 				  // Recall the timestamp of the last transmission. If the next transmission occures after more than 'timeout',
@@ -148,7 +152,7 @@ module.exports = function(app) {
               return;
         
             if (config.source == 'lux' && config.Lux && path == config.Lux.path) { 
-              app.debug(`Switching to runMode \'lux\' luxPath: ${config.Lux['path']}`)
+              app.debug(`Switching to runMode \'lux\', luxPath: ${config.Lux['path']}`)
               runMode = 'lux'
             }
             
