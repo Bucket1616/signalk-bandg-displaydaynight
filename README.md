@@ -1,8 +1,10 @@
 # signalk-bandg-displaydaynight
 Auto adjust the display mode (night/day/backlight) based on different modes.
-Config can be created per network group.
+Config can be created per network group.  Each netowrk group can operate under different modes and have different backlight settings.  
+By using the Device Power-On ReSync, devices that are in a group with a setting of "Update Display mode only on environment.sun/mode changes" checked, will not have to wait for a change in the environment.sun or environment.mode deltas in order to take the backlight setting they should.
+In order to use the feature, the plugin must be configured with a path that begins transmitting when the device(typically a Chartplotter) first powers on.  For the B&G Zeus 3S, very little is transmitted prior to the user accepting the User Agreement. navigation.currentRoute.name is one that can be used, even is a route is not being followed. If the Chartplotter was last used at night and then turned off, the chartplotter will power on in what could be a very dark mode of operation.  With this section configured, the plugin will notice the path appear and immediately send out a backlight update so that the display brightness is quickly corrected.
 
-The plugin supports currently 2 modes:
+The plugin supports currently 3 modes:
 ### Mode
 This mode subscribes to ``environment.mode`` and will switch between day and night. Backlight level for both can be set.
 ### Sun
