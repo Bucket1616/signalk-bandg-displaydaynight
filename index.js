@@ -27,6 +27,7 @@ module.exports = function(app) {
   plugin.start = function(options, restartPlugin) {
     plugin.options = options;
     app.debug('Plugin started');
+    app.debug('Schema: %s', JSON.stringify(options));
     
     // Local state variables
     var runMode = 'mode';
@@ -86,13 +87,14 @@ module.exports = function(app) {
       },
       delta => {
         delta.updates.forEach(u => {
-          // Standard variables
-          var path = u['values'][0]['path']
+          app.debug('u: %s', JSON.stringify(u))
+		  var path = u['values'][0]['path']
           var value = u['values'][0]['value']
           var source = u['source'] ? u['source']['label'] : delta.source ? delta.source.label : 'unknown'; 
           
           options.config.forEach(config => {
             var group = config.group;
+            app.debug(`RunMode: ${runMode} group: ${group}`)
 
             // --------------------------------------------------------
             // Resync Logic
@@ -140,9 +142,11 @@ module.exports = function(app) {
 
             //always use external control if selected
             if (config.source == 'none')
+				aap.debug("
               return;
         
             if (config.source == 'lux' && config.Lux && path == config.Lux.path) { 
+              app.debug('Switching to runMode \'lux\' luxPath: ${config.Lux['path']}')
               runMode = 'lux'
             }
             
@@ -163,6 +167,7 @@ module.exports = function(app) {
 	              }
                   
                   if (config['source'] != 'mode') { 
+                    app.debug('Used backup mode \'mode\', switching to \'sun\'')
                     runMode = 'sun'
                   }
 	              break;
@@ -170,6 +175,8 @@ module.exports = function(app) {
 	            case 'sun':
 	              if (path != 'environment.sun') break;
 	              var sunMode = value
+		          app.debug('environment.sun: %s', sunMode);
+
 	              if (!config.Sun[sunMode]) break; // Safety check
 
 	              var mode = config.Sun[sunMode]['mode'];
