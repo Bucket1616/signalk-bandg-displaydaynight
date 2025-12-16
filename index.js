@@ -359,4 +359,219 @@ module.exports = function(app) {
 			        default: 'mode'
 			      },
             // Resync Section
-            Res
+            Resync: {
+              title: 'Device Power-On Resync',
+              description: 'Force a settings update when a device (i.e., chartplotter) appears after being offline.',
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  path: {
+                    type: 'string',
+                    title: 'Trigger Path (e.g. navigation.courseOverGround, or navigation.currentRoute.name - See README)',
+                    default: ''
+                  },
+                  source: {
+                    type: 'string',
+                    title: 'Source ID (e.g. N2K.115). Leave empty to match any source.',
+                    default: ''
+                  },
+                  timeout: {
+                    type: 'number',
+                    title: 'Inactivity Timeout (seconds). Resend settings if data is seen after this many seconds of silence.',
+                    default: 60
+                  }
+                }
+              }
+            },
+			      Mode: {
+			        title: 'Mode based settings',
+			        description: 'Adjust the display mode based on `environment.mode` (derived-data). Below the backlight level can be set for day and night mode.',
+			        type: 'object',
+			        properties: {
+			          updateOnce: {
+			            type: 'boolean',
+			            title: 'Update display mode only when environment.mode changes.',
+			            default: true,
+			          },
+			          dayLevel: {
+			            type: 'number',
+			            title: 'Backlight level in day mode (1-10)',
+			            default: 6,
+			          },
+			          nightLevel: {
+			            type: 'number',
+			            title: 'Backlight level in night mode (1-10)',
+			            default: 3,
+			          }
+			        }
+			      },
+			      Sun: {
+			        title: 'Sun based settings',
+			        description: 'Adjust the display mode based on `environment.sun` (derived-data). Below the display mode and backlight level can be set for each mode.',
+			        type: 'object',
+			        properties: {
+			          updateOnce: {
+			            type: 'boolean',
+			            title: 'Update display mode only when environment.sun changes.',
+			            default: true,
+			          },
+			          dawn: {
+			            type: 'object',
+			            title: 'Dawn',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nightmode (1-10)',
+			                default: 4,
+			              },
+			            },
+			          },
+			          sunrise: {
+			            type: 'object',
+			            title: 'Sunrise',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'day'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nightmode (1-10)',
+			                default: 4,
+			              },
+			            },
+			          },
+			          day: {
+			            type: 'object',
+			            title: 'Day',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'day'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in day mode (1-10)',
+			                default: 6,
+			              },
+			            },
+			          },
+			          sunset: {
+			            type: 'object',
+			            title: 'Sunset',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'day'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nightmode (1-10)',
+			                default: 4,
+			              },
+			            },
+			          },
+			          dusk: {
+			            type: 'object',
+			            title: 'Dusk',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in day mode (1-10)',
+			                default: 4,
+			              },
+			            },
+			          },
+			          night: {
+			            type: 'object',
+			            title: 'Night',
+			            properties: {
+			              mode: {
+			                type: 'string',
+			                title: 'Select day or night mode',
+			                enum: ['day', 'night'],
+			                enumNames: ['Day', 'Night'],
+			                default: 'night'
+			              },
+			              backlight: {
+			                type: 'number',
+			                title: 'Backlight level in nightmode (1-10)',
+			                default: 2,
+			              },
+			            },
+			          },
+			        },
+			      },
+			            
+			      Lux: {
+			        title: 'Lux based settings',
+			        description: 'Adjust the display mode based on `environment.outside.lux`. Below the display mode and backlight level can be added per lux range.',
+			        type: 'object',
+			        properties: {
+			          path: {
+			            type: 'string',
+			            title: 'Path to outside lux value',
+			            default: 'environment.outside.lux'
+			          },
+			          table: {
+			            type: 'array',
+			            title: 'Table entries',
+			            items: {
+			              type: 'object',
+			              properties: {
+			                luxMin: {
+			                  type: 'number',
+			                  title: 'Minimal lux (lux) level'
+			                },
+			                luxMax: {
+			                  type: 'number',
+			                  title: 'Max lux (lux) level'
+			                },
+			                dayNight: {
+			                  type: 'string',
+			                  title: 'Mode',
+			                  enum: ['day', 'night'],
+			                  enumNames: ['Day', 'Night'],
+			                  default: 'day'
+			                },
+			                backlightLevel: {
+			                  type: 'number',
+			                  title: 'Backlight level (1-10)',
+			                  default: 2
+			                }
+			              }
+			            }
+			          }
+			        }
+			      }
+          }
+        }
+      }
+    }
+  }
+  return plugin
+}
