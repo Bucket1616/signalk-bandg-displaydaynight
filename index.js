@@ -28,17 +28,14 @@ module.exports = function(app) {
     plugin.options = options;
     app.debug('Plugin started');
     
-    // Note: removed "var lastState = {}" that was here in your original code
-    // because it shadowed the global variable defined at the top of the file.
-    // We will use a new local tracking object.
-    
+    // Local state variables
     var runMode = 'mode';
-
-    // --- NEW: Cache for the last command sent per group ---
+    
+    // Cache for the last command sent per group
     // Structure: { 'Default': { mode: 'day', level: 10 } }
     var lastSentSettings = {}; 
 
-    // --- NEW: Tracker for Resync Activity ---
+    // Tracker for Resync Activity
     // Structure: { 'Group_Source_Path': timestamp_ms }
     var activityTracker = {};
 
@@ -57,16 +54,17 @@ module.exports = function(app) {
       ]
     }
 
+    // Build subscriptions based on config
     if (typeof options.config != 'undefined') {
       options.config.forEach(config => {
-        // Add Lux path if configured
-        if(config.Lux && config.Lux['path']) {
-           localSubscription.subscribe.push({
-             path: config.Lux['path']
-           })
+        // Lux subscription
+        if (config.Lux && config.Lux['path']) {
+          localSubscription.subscribe.push({
+            path: config.Lux['path']
+          })
         }
 
-        // --- NEW: Subscribe to Resync Trigger Paths ---
+        // Resync Trigger subscription
         if (config.Resync && Array.isArray(config.Resync)) {
           config.Resync.forEach(trigger => {
             if (trigger.path && trigger.path.length > 0) {
@@ -91,10 +89,14 @@ module.exports = function(app) {
           // Standard variables
           var path = u['values'][0]['path']
           var value = u['values'][0]['value']
-          var source = u['source'] ? u['source']['label'] : delta.source ? delta.source.label : 'unknown'; // Get source label
+          var source = u['source'] ? u['source']['label'] : delta.source ? delta.source.label : 'unknown'; 
           
           options.config.forEach(config => {
             var group = config.group;
+
+            // --------------------------------------------------------
+            // Resync Logic
+            // --------------------------------------------------------
             if (config.Resync && Array.isArray(config.Resync)) {
               config.Resync.forEach(trigger => {
                 // Check if this delta matches the trigger path
@@ -132,69 +134,65 @@ module.exports = function(app) {
                 }
               });
             }
+            // --------------------------------------------------------
+            // End Resync Logic
+            // --------------------------------------------------------
+
             //always use external control if selected
             if (config.source == 'none')
               return;
         
-            app.debug(`RunMode: ${runMode} group: ${group} luxPath: ${config.Lux['path']}`)
-            if (config.source == 'lux' && path == config.Lux.path) { 
-              app.debug('Switching to runMode \'lux\'')
+            if (config.source == 'lux' && config.Lux && path == config.Lux.path) { 
               runMode = 'lux'
             }
+            
 	          switch (runMode) {
 	            case 'mode':
 	              if (path != 'environment.mode') break;
 	              var dayNight = value
 
-                if (config.Mode['updateOnce']) {
-                  if (dayNight == lastState[group])
-                    break
-                  lastState[group] = dayNight
-                }
+                  if (config.Mode['updateOnce']) {
+                    if (dayNight == lastState[group]) break
+                    lastState[group] = dayNight
+                  }
 
-			          if (dayNight == 'night') {
-			            executeCommand(dayNight, config.Mode['nightLevel'], group);
-			            app.debug('Setting display mode to %s and backlight level to %s for group %s', dayNight, config.Mode['nightLevel'],group)
-			          } else {
-			            executeCommand(dayNight, config.Mode['dayLevel'], group);
-			            app.debug('Setting display mode to %s and backlight level to %s for group %s', dayNight, config.Mode['dayLevel'], group)
+			      if (dayNight == 'night') {
+                    executeCommand(dayNight, config.Mode['nightLevel'], group);
+			      } else {
+                    executeCommand(dayNight, config.Mode['dayLevel'], group);
 	              }
-                if (config['source'] != 'mode') { 
-                  app.debug('Used backup mode \'mode\', switching to \'sun\'')
-                  runMode = 'sun'
-                }
+                  
+                  if (config['source'] != 'mode') { 
+                    runMode = 'sun'
+                  }
 	              break;
+
 	            case 'sun':
 	              if (path != 'environment.sun') break;
 	              var sunMode = value
-			          app.debug('environment.sun: %s', sunMode);
+	              if (!config.Sun[sunMode]) break; // Safety check
 
 	              var mode = config.Sun[sunMode]['mode'];
 
-                if (config.Sun['updateOnce']) {
-                  if (sunMode == lastState[group])
-                    break
-                  lastState[group] = sunMode
-                }
+                  if (config.Sun['updateOnce']) {
+                    if (sunMode == lastState[group]) break
+                    lastState[group] = sunMode
+                  }
 
 	              var backlightLevel = config.Sun[sunMode]['backlight'];
-			          app.debug('Setting display mode to %s and backlight level to %s', mode, backlightLevel);
-			          setDisplayMode(mode, group);
-			          setBacklightLevel(backlightLevel, group);
-	              sendUpdate(mode, backlightLevel)
+                  executeCommand(mode, backlightLevel, group);
 	              break;
+
 	            case 'lux':
+                  if (!config.Lux) break;
 	              if (path != config.Lux.path) break;
-                config.Lux.table.forEach(element => {
-                  if (Number(value) >= Number(element.luxMin) && Number(value) <= Number(element.luxMax)) {
-                    var mode = element.dayNight
-                    var backlightLevel = element.backlightLevel
-			              app.debug('Setting display mode to %s and backlight level to %s', mode, backlightLevel);
-			              setDisplayMode(mode, group);
-			              setBacklightLevel(backlightLevel, group);
-	                  sendUpdate(mode, backlightLevel)
-                  }
-                })
+                  config.Lux.table.forEach(element => {
+                    if (Number(value) >= Number(element.luxMin) && Number(value) <= Number(element.luxMax)) {
+                      var mode = element.dayNight
+                      var backlightLevel = element.backlightLevel
+                      executeCommand(mode, backlightLevel, group);
+                    }
+                  })
 	              break;
 	          }
           })
@@ -202,40 +200,36 @@ module.exports = function(app) {
       }
     );
 
-     
+    // Helper Function to Centralize Sending and Caching
     function executeCommand(mode, level, group) {
-      // Cache this simply
-      lastSentSettings[group] = { mode: mode, level: level };
-       
-      app.debug(`Executing command for Group ${group}: Mode=${mode}, Level=${level}`);
-      setDisplayMode(mode, group);
-      setBacklightLevel(level, group);
-      sendUpdate(mode, level);
+        // Cache this simply
+        lastSentSettings[group] = { mode: mode, level: level };
+        
+        app.debug(`Executing command for Group ${group}: Mode=${mode}, Level=${level}`);
+        setDisplayMode(mode, group);
+        setBacklightLevel(level, group);
+        sendUpdate(mode, level);
     }
-		
+    
     function doChangeDisplayMode(context, path, value, callback)
     {
       app.debug("Change Display Mode PUT: " + JSON.stringify(value))
   
-      //don't force group use
       if (!(value.group in networkGroups))
         value.group = 'Default';
 
       // Update cache manually if PUT request is used
       if (!lastSentSettings[value.group]) lastSentSettings[value.group] = {};
-			
-			//did we send a mode?
-      if (!(value.mode in ['day', 'night']))
+
+      if (['day', 'night'].includes(value.mode))
       {
         lastSentSettings[value.group].mode = value.mode;
-				app.debug(`Update display daynight mode: ${value.mode}`)
         setDisplayMode(value.mode, value.group)
       }
       
-      //did we give a valid value?
       if (parseInt(value.backlight) >= 1 && parseInt(value.backlight) <= 10)
       {
-        app.debug(`Update display backlight: ${value.backlight}`)
+        lastSentSettings[value.group].level = parseInt(value.backlight);
         setBacklightLevel(parseInt(value.backlight), value.group)
       }
 
@@ -315,7 +309,6 @@ module.exports = function(app) {
   }
 
   plugin.stop = function() {
-    // Here we put logic we need when the plugin stops
     app.debug('Plugin stopped');
     unsubscribes.forEach(f => f());
     app.setPluginStatus('Stopped');
@@ -345,6 +338,7 @@ module.exports = function(app) {
 			        enumNames: ['Mode based', 'Sun based', 'Lux based', 'None / External (Use PUT interface)'],
 			        default: 'mode'
 			      },
+            // Resync Section
             Resync: {
               title: 'Device Power-On Resync',
               description: 'Force a settings update when a device appears after being offline.',
@@ -354,7 +348,7 @@ module.exports = function(app) {
                 properties: {
                   path: {
                     type: 'string',
-                    title: 'Trigger Path (e.g. navigation.position)',
+                    title: 'Trigger Path (e.g. navigation.courseOverGround)',
                     default: ''
                   },
                   source: {
@@ -370,7 +364,7 @@ module.exports = function(app) {
                 }
               }
             },
-						Mode: {
+			      Mode: {
 			        title: 'Mode based settings',
 			        description: 'Adjust the display mode based on `environment.mode` (derived-data). Below the backlight level can be set for day and night mode.',
 			        type: 'object',
