@@ -142,11 +142,10 @@ module.exports = function(app) {
 
             //always use external control if selected
             if (config.source == 'none')
-				aap.debug("
               return;
         
             if (config.source == 'lux' && config.Lux && path == config.Lux.path) { 
-              app.debug('Switching to runMode \'lux\' luxPath: ${config.Lux['path']}')
+              app.debug(`Switching to runMode \'lux\' luxPath: ${config.Lux['path']}`)
               runMode = 'lux'
             }
             
