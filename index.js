@@ -69,7 +69,7 @@ module.exports = function(app) {
         if (config.Resync && Array.isArray(config.Resync)) {
           config.Resync.forEach(trigger => {
             if (trigger.path && trigger.path.length > 0) {
-              app.debug(`Adding monitor subscription for group ${config.group}: ${trigger.path}`);
+              app.debug(`Adding monitor subscription for group \'${config.group}\': ${trigger.source}'-'${trigger.path}`);
               localSubscription.subscribe.push({
                 path: trigger.path
               });
@@ -121,20 +121,27 @@ module.exports = function(app) {
                   var lastSeen = activityTracker[trackerKey];
                   var timeoutMs = (trigger.timeout || 60) * 1000;
 
-                  // If never seen, or timeout expired
-                  if (!lastSeen || (now - lastSeen > timeoutMs)) {
-                    app.debug(`Resync Triggered for Group ${group}. Device ${source} on ${path} active after ${lastSeen ? (now-lastSeen)/1000 : 'infinite'}s silence.`);
+                  // If never seen (First run for this specific device), just initialize it to prvent un-necessary Resync N2k Message
+                  if (!lastSeen) {
+                    app.debug(`[Resync Initialized: First time seeing ${source} on ${path}. Monitoring started.`);
+                    activityTracker[trackerKey] = now;
+                    return; // Exit. Do not trigger resync on first sight.
+                  }
+
+                  // If timeout expired (Actual silence detected)
+                  if (now - lastSeen > timeoutMs) {
+                    app.debug(`Resync Triggered for Group \'${group}\'. Device ${source} active on ${path} after ${lastSeen ? (now-lastSeen)/1000 : 'infinite'}s silence.`);
                      
                     // Force resend of last known settings
                     if (lastSentSettings[group]) {
                       var settings = lastSentSettings[group];
-                      app.debug(`Resending cached settings: Mode ${settings.mode}, Level ${settings.level}`);
-                       
+                      app.debug(`Resending cached settings: Mode \'${settings.mode}\', Level \'${settings.level}\'`);
+                      
                       // We call the raw N2K senders directly to avoid loop/logic checks
                       setDisplayMode(settings.mode, group);
                       setBacklightLevel(settings.level, group);
                     } else {
-                      app.debug(`Cannot Resync: No settings have been calculated yet for group ${group}`);
+                      app.debug(`Cannot Resync: No settings have been calculated yet for group \'${group}\'`);
                     }
                   }
 
@@ -149,7 +156,13 @@ module.exports = function(app) {
 
             // Initialize runMode for this group if it doesn't exist yet
             if (!groupRunModes[group]) {
-                groupRunModes[group] = 'mode';
+                // If the config says 'none', default to 'mode' just to have a valid state
+                if (config.source && config.source !== 'none') {
+                    groupRunModes[group] = config.source;
+                } else {
+                    groupRunModes[group] = 'mode';
+                }
+                app.debug(`Group ${group}: Initialized group '${group}' with runMode '${groupRunModes[group]}'`);
             }
             // Get the current mode for THIS group
             var runMode = groupRunModes[group];            
@@ -181,7 +194,7 @@ module.exports = function(app) {
                   }
                   
                   if (config['source'] != 'mode') { 
-                    app.debug(`Group ${group}: Used backup mode 'mode', switching to 'sun'`)
+                    app.debug(`Group \'${group}\': Mode Not Set! Used backup mode 'mode', switching to 'sun'`)
                     groupRunModes[group] = 'sun';
                   }
                   break;
@@ -225,7 +238,7 @@ module.exports = function(app) {
         // Cache this simply
         lastSentSettings[group] = { mode: mode, level: level };
         
-        // app.debug(`Executing command for Group ${group}: Mode=${mode}, Level=${level}`);
+        app.debug(`Executing command for Group \'${group}\': Set Mode=${mode}, Level=${level}`);
         setDisplayMode(mode, group);
         setBacklightLevel(level, group);
         sendUpdate(mode, level);
@@ -257,7 +270,7 @@ module.exports = function(app) {
     }    
     
     function sendN2k(msgs) {
-      // app.debug("n2k_msg: " + msgs)
+      app.debug("n2k_msg: " + msgs)
       msgs.map(function(msg) { app.emit('nmea2000out', msg)})
     }
 
@@ -274,7 +287,7 @@ module.exports = function(app) {
     }
 
     function setDisplayMode(mode, group) {
-      app.debug('setDisplayMode for group: %s to %s', group, mode)
+      app.debug('setDisplayMode for group \'%s\' to \'%s\'', group, mode)
       var PGN130845_dayNight = "%s,3,130845,%s,255,0e,41,9f,ff,ff,%s,ff,ff,26,00,01,%s,ff,ff,ff"; // 02 = day, 04 = night
       if (mode == 'day') {
         var msg = util.format(PGN130845_dayNight, (new Date()).toISOString(), sourceAddress, networkGroups[group], '02');
@@ -287,7 +300,7 @@ module.exports = function(app) {
     }
 
     function setBacklightLevel(level, group) {
-      app.debug('setBacklightLevel for group: %s to level %s', group, level)
+      app.debug('setBacklightLevel for group \'%s\' to level \'%s\'', group, level)
       var PGN130845_backlightLevel = "%s,3,130845,%s,255,0e,41,9f,ff,ff,%s,ff,ff,12,00,01,%s,ff,ff,ff"; 
       var msg = util.format(PGN130845_backlightLevel, (new Date()).toISOString(), sourceAddress, networkGroups[group], intToHex(level*10));
       sendN2k([msg]);
@@ -302,7 +315,7 @@ module.exports = function(app) {
         }
       }]
 
-      // app.debug('Updating with: ' + JSON.stringify(update))
+      app.debug('Updating with: ' + JSON.stringify(update))
       app.handleMessage(plugin.id, {
         updates: [
           {
