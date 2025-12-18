@@ -210,6 +210,7 @@ module.exports = function(app) {
                   if (config.Sun['updateOnce']) {
                     if (sunMode == lastState[group]) break
                     lastState[group] = sunMode
+					app.debug(`Change in environment.sun to \'${value}\' received.  Sending backlight command`)
                   }
 
                   var backlightLevel = config.Sun[sunMode]['backlight'];
